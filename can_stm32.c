@@ -1,5 +1,12 @@
 #include <soc.h>
 
+typedef struct {
+    uint32_t id;
+    uint8_t dlc;
+    uint8_t flags;
+    uint8_t data[8];
+} can_frame;
+
 void can_stm32_init(CAN_TypeDef * can)
 {
     /* enter init mode */
@@ -50,6 +57,22 @@ void can_stm32_init(CAN_TypeDef * can)
     can->MCR &= ~CAN_MCR_INRQ;
     while(can->MSR & CAN_MSR_INAK != 0U){};
 
+}
+
+void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
+{
+    uint8_t tx_index_mailbox = 0;
+
+    /* check if mailbox is empty */
+    for(tx_index_mailbox = 0; tx_index_mailbox < 3; tx_index_mailbox ++)
+    {
+        /* in case tx mailbox empty */
+        if(can->sTxMailBox[tx_index_mailbox].TIR & CAN_TI0R_TXRQ == 0U)
+        {
+            /* fullfill id */
+            can->sTxMailBox[tx_index_mailbox].TIR = (frame->id) << CAN_TI0R_EXID_Pos;
+        }
+    }
 }
 
 
