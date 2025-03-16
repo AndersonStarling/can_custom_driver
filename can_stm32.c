@@ -106,33 +106,49 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
 {
     uint8_t rx_index_mailbox = 0;
     uint8_t sub_index = 0;
+    volatile uint32_t FIFO_FMP_array[2]  = {can->RF0R & CAN_RF0R_FMP0, can->RF1R & CAN_RF1R_FMP1};
+    volatile uint32_t FIFO_RFOM_array[2] = {can->RF0R & CAN_RF0R_RFOM0, can->RF1R & CAN_RF1R_RFOM1};
+
 
     /* polling waiting for message come */
     while(can->IER & CAN_IER_FMPIE0 == 0U || \
           can->IER & CAN_IER_FMPIE1 == 0U){};
 
-    for(rx_index_mailbox =  0; rx_index_mailbox < 3; rx_index_mailbox ++)
+    /* FIFO 0 have message */
+    if(can->IER & CAN_IER_FMPIE0 == 0U)
+    {
+        rx_index_mailbox = 0;
+    }
+    /* FIFO 1 have message */
+    else if(can->IER & CAN_IER_FMPIE1 == 0U)
+    {
+        rx_index_mailbox = 1;
+    }
+    else
+    {
+        /* no message */
+    }
+
+    while(FIFO_FMP_array[rx_index_mailbox] != 0U)
     {
         /* get id */
-        recv_frame->id = can->sFIFOMailBox[rx_index_mailbox].RIR >> CAN_RI0R_EXID_Pos;
-
+        recv_frame->id = can->sFIFOMailBox[rx_index_mailbox].RIR >> CAN_RI0R_EXID_Pos
         /* get fram type */
         recv_frame->flags = can->sFIFOMailBox[rx_index_mailbox].RIR & CAN_RI0R_RTR;
-
         /* get data len */
         recv_frame->flags = can->sFIFOMailBox[rx_index_mailbox].RDTR & CAN_RDT0R_DLC;
-
         /* get 4 low byte */
         for(sub_index = 0; sub_index < 4; sub_index ++)
         {
             recv_frame->data[sub_index] = (can->sFIFOMailBox[rx_index_mailbox].RDLR >> (sub_index * 8)) & 0xFF;
         }
-
         /* get 4 high byte */
         for(sub_index = 0; sub_index < 4; sub_index ++)
         {
             recv_frame->data[sub_index + 4] = (can->sFIFOMailBox[rx_index_mailbox].RDHR >> (sub_index * 8)) & 0xFF;
         }
+        /* release RX FIFO mailbox */
+        FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
     }
 }
 
