@@ -1,21 +1,17 @@
 #include <soc.h>
 
-typedef struct {
-    uint32_t id;
-    uint8_t dlc;
-    uint8_t flags;
-    uint8_t data[8];
-} can_frame;
+#include "stm32f7xx.h"
+#include "can.h"
 
 void can_stm32_init(CAN_TypeDef * can)
 {
     /* enter init mode */
     can->MCR |= CAN_MCR_INRQ;
-    while(can->MSR & CAN_MSR_INAK == 0U){};
+    while((can->MSR & CAN_MSR_INAK) == 0U){};
 
     /* exit sleep mode */
     can->MCR &= ~CAN_MCR_SLEEP;
-    while(can->MSR & CAN_MSR_SALK == 0U){};
+    while((can->MSR & CAN_MSR_SLAK) == 0U){};
 
     /* set bit timing */
     /* dummy waiting for re-calculation clock */
@@ -55,7 +51,7 @@ void can_stm32_init(CAN_TypeDef * can)
 
     /* leave init mode */
     can->MCR &= ~CAN_MCR_INRQ;
-    while(can->MSR & CAN_MSR_INAK != 0U){};
+    while((can->MSR & CAN_MSR_INAK) != 0U){};
 
 }
 
@@ -67,7 +63,7 @@ void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
     for(tx_index_mailbox = 0; tx_index_mailbox < 2; tx_index_mailbox ++)
     {
         /* in case tx mailbox empty */
-        if(can->sTxMailBox[tx_index_mailbox].TIR & CAN_TI0R_TXRQ == 0U)
+        if((can->sTxMailBox[tx_index_mailbox].TIR & CAN_TI0R_TXRQ) == 0U)
         {
             /* fullfill id */
             can->sTxMailBox[tx_index_mailbox].TIR |= (frame->id) << CAN_TI0R_EXID_Pos;
@@ -94,7 +90,7 @@ void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
             /* request send */
             can->sTxMailBox[tx_index_mailbox].TIR |= CAN_TI0R_TXRQ;
             /* polling waiting for message already sent */
-            while(can->sTxMailBox[tx_index_mailbox].TIR & CAN_TI0R_TXRQ != 0U){};
+            while((can->sTxMailBox[tx_index_mailbox].TIR & CAN_TI0R_TXRQ) != 0U){};
 
             break;
  
@@ -111,16 +107,16 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
 
 
     /* polling waiting for message come */
-    while(can->IER & CAN_IER_FMPIE0 == 0U || \
-          can->IER & CAN_IER_FMPIE1 == 0U){};
+    while((can->IER & CAN_IER_FMPIE0) == 0U || \
+          (can->IER & CAN_IER_FMPIE1) == 0U){};
 
     /* FIFO 0 have message */
-    if(can->IER & CAN_IER_FMPIE0 == 0U)
+    if((can->IER & CAN_IER_FMPIE0) == 0U)
     {
         rx_index_mailbox = 0;
     }
     /* FIFO 1 have message */
-    else if(can->IER & CAN_IER_FMPIE1 == 0U)
+    else if((can->IER & CAN_IER_FMPIE1) == 0U)
     {
         rx_index_mailbox = 1;
     }
@@ -132,7 +128,7 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
     while(FIFO_FMP_array[rx_index_mailbox] != 0U)
     {
         /* get id */
-        recv_frame->id = can->sFIFOMailBox[rx_index_mailbox].RIR >> CAN_RI0R_EXID_Pos
+        recv_frame->id = can->sFIFOMailBox[rx_index_mailbox].RIR >> CAN_RI0R_EXID_Pos;
         /* get fram type */
         recv_frame->flags = can->sFIFOMailBox[rx_index_mailbox].RIR & CAN_RI0R_RTR;
         /* get data len */
@@ -151,6 +147,26 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
