@@ -44,14 +44,31 @@ void can_stm32_init(CAN_TypeDef * can)
     /* configure filter bank 0 */
     /* dummy configure all matched id = 0 */
     for (int i = 0; i < 28; i++) {
-        can->sFilterRegister[i].FR1 = 0x0u;
-        can->sFilterRegister[i].FR2 = 0x0u;
+        can->sFilterRegister[i].FR1 = 0x1u;
+        can->sFilterRegister[i].FR2 = 0x1u;
     }
+}
 
+void can_stm32_set_mode(CAN_TypeDef * can, uint32_t can_mode)
+{
+    switch(can_mode)
+    {
+        case CAN_MODE_SILENT:
+            can->BTR |= CAN_BTR_SILM;
+            break;
+        case CAN_MODE_LOOPBACK:
+            can->BTR |= CAN_BTR_LBKM;
+            break;
+        default:
+            break;
+    }
+}
+
+void can_stm32_start(CAN_TypeDef * can)
+{
     /* leave init mode */
     can->MCR &= ~CAN_MCR_INRQ;
     while((can->MSR & CAN_MSR_INAK) != 0U){};
-
 }
 
 void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
@@ -146,6 +163,13 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
     }
 }
+
+
+
+
+
+
+
 
 
 
