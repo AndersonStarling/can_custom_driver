@@ -11,12 +11,11 @@ void can_stm32_init(CAN_TypeDef * can)
 
     /* exit sleep mode */
     can->MCR &= ~CAN_MCR_SLEEP;
-    while((can->MSR & CAN_MSR_SLAK) == 0U){};
+    while((can->MSR & CAN_MSR_SLAK) != 0U){};
 
     /* set bit timing */
     /* dummy waiting for re-calculation clock */
     can->BTR |= (CAN_BTR_BRP) | (CAN_BTR_TS1) | (CAN_BTR_TS2) | (CAN_BTR_SJW);
-
 
     /* allow CPU access to filter */
     can->FMR |= CAN_FMR_FINIT;
@@ -147,6 +146,19 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
