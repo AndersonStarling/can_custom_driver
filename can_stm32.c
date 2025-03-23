@@ -22,8 +22,8 @@ void can_stm32_init(CAN_TypeDef * can)
     can->FMR |= 0x11011u << CAN_FMR_CAN2SB_Pos;
 
     /* configure mode for all filter bank */
-    /* configure all filter bank under list mode that mean comming message need to map 1:1 */
-    can->FM1R = 0xFFFFFFFu;
+    /* configure all filter bank under mask mode that mean comming message no need to map 1:1 */
+    can->FM1R = 0x00;
 
     /* configure filter scable */
     /* configure all filter bank for 32 bit mask mode */
