@@ -1,8 +1,5 @@
 #include <soc.h>
 
-#include "stm32f7xx.h"
-#include "can.h"
-
 void can_stm32_init(CAN_TypeDef * can)
 {
     /* enter init mode */
@@ -36,9 +33,6 @@ void can_stm32_init(CAN_TypeDef * can)
     /* a half passing filter message to FIFO 0, otherwise will move to FIFO 1 */
     can->FFA1R = 0x1FFFu;
 
-    /* configure all filter active */
-    can->FA1R = 0xFFFFFFFu;
-
     /* configure id for all filter bank */
 
     /* configure filter bank 0 */
@@ -47,6 +41,12 @@ void can_stm32_init(CAN_TypeDef * can)
         can->sFilterRegister[i].FR1 = 0x1u;
         can->sFilterRegister[i].FR2 = 0x1u;
     }
+
+    /* configure all filter active */
+    can->FA1R = 0xFFFFFFFu;
+
+    /* active filter */
+    can->FMR &= ~CAN_FMR_FINIT;
 }
 
 void can_stm32_set_mode(CAN_TypeDef * can, uint32_t can_mode)
@@ -86,7 +86,7 @@ void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
 
             /* select standard id or extend id */
             /* default configure as extended id */
-            can->sTxMailBox[tx_index_mailbox].TIR = CAN_TI0R_IDE;
+            can->sTxMailBox[tx_index_mailbox].TIR |= CAN_TI0R_IDE;
 
             /* remote frame or data frame */
             can->sTxMailBox[tx_index_mailbox].TIR &= ~CAN_TI0R_RTR;
@@ -163,8 +163,6 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
     }
 }
-
-
 
 
 
