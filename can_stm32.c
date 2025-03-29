@@ -23,7 +23,7 @@ void can_stm32_init(CAN_TypeDef * can)
 
     /* configure mode for all filter bank */
     /* configure all filter bank under mask mode that mean comming message no need to map 1:1 */
-    can->FM1R = 0x00;
+    can->FM1R = 0xffffffff;
 
     /* configure filter scable */
     /* configure all filter bank for 32 bit mask mode */
@@ -38,8 +38,8 @@ void can_stm32_init(CAN_TypeDef * can)
     /* configure filter bank 0 */
     /* dummy configure all matched id = 0 */
     for (int i = 0; i < 28; i++) {
-        can->sFilterRegister[i].FR1 = 0x1u;
-        can->sFilterRegister[i].FR2 = 0x1u;
+        can->sFilterRegister[i].FR1 = (0x1u << 3) | (1 << 2);
+        can->sFilterRegister[i].FR2 = (0x1u << 3) | (1 << 2);
     }
 
     /* configure all filter active */
@@ -81,6 +81,8 @@ void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
         /* in case tx mailbox empty */
         if((can->sTxMailBox[tx_index_mailbox].TIR & CAN_TI0R_TXRQ) == 0U)
         {
+        	can->sTxMailBox[tx_index_mailbox].TIR = 0;
+
             /* fullfill id */
             can->sTxMailBox[tx_index_mailbox].TIR |= (frame->id) << CAN_TI0R_EXID_Pos;
 
@@ -163,9 +165,6 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
     }
 }
-
-
-
 
 
 
