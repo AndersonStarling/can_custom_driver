@@ -20,6 +20,13 @@ typedef struct
     uint32_t filter_mask; /* filter mask */
 } can_stm32_filter_struct_t;
 
+typedef enum
+{
+    CAN_MODE_SILENT    = 0,
+    CAN_MODE_LOOPBACK  = 1,
+} can_stm32_mode_enum_t;
+
+
 
 static void can_stm32_configure_filter(CAN_TypeDef * can, can_stm32_filter_struct_t * filter)
 {
@@ -81,8 +88,6 @@ static void can_stm32_configure_bit_timing(CAN_TypeDef * can, can_stm32_bit_timi
                 (bit_timing->resync_jump_width);
 }
 
-
-
 void can_stm32_init(CAN_TypeDef * can)
 {
     /* enter init mode */
@@ -93,7 +98,7 @@ void can_stm32_init(CAN_TypeDef * can)
 
 }
 
-void can_stm32_set_mode(CAN_TypeDef * can, uint32_t can_mode)
+void can_stm32_set_mode(CAN_TypeDef * can, can_stm32_mode_enum_t can_mode)
 {
     switch(can_mode)
     {
