@@ -1,10 +1,5 @@
 #include <soc.h>
 
-typedef struct
-{
-    /* data */
-} can_filter ;
-
 /* can bit timing */
 typedef struct
 {
@@ -63,6 +58,13 @@ static void can_stm32_enter_init_mode(CAN_TypeDef * can)
     while((can->MSR & CAN_MSR_INAK) == 0U){};
 }
 
+static void can_stm32_exit_init_mode(CAN_TypeDef * can)
+{
+    /* leave init mode */
+    can->MCR &= ~CAN_MCR_INRQ;
+    while((can->MSR & CAN_MSR_INAK) != 0U){};
+}
+
 static void can_stm32_exit_sleep_mode(CAN_TypeDef * can)
 {
     /* exit sleep mode */
@@ -84,50 +86,11 @@ static void can_stm32_configure_bit_timing(CAN_TypeDef * can, can_stm32_bit_timi
 void can_stm32_init(CAN_TypeDef * can)
 {
     /* enter init mode */
-    can->MCR |= CAN_MCR_INRQ;
-    while((can->MSR & CAN_MSR_INAK) == 0U){};
+    can_stm32_exit_init_mode(can);
 
     /* exit sleep mode */
-    can->MCR &= ~CAN_MCR_SLEEP;
-    while((can->MSR & CAN_MSR_SLAK) != 0U){};
+    can_stm32_exit_sleep_mode(can);
 
-    /* set bit timing */
-    /* dummy waiting for re-calculation clock */
-    can->BTR |= (CAN_BTR_BRP) | (CAN_BTR_TS1) | (CAN_BTR_TS2) | (CAN_BTR_SJW);
-
-    /* allow CPU access to filter */
-    can->FMR |= CAN_FMR_FINIT;
-
-    /* configure filter bank for CAN 1 and CAN 2 */
-    /* configure 27 filter bank for CAN 1 and 1 filter bank for CAN 2 */
-    can->FMR |= 0x11011u << CAN_FMR_CAN2SB_Pos;
-
-    /* configure mode for all filter bank */
-    /* configure all filter bank under mask mode that mean comming message no need to map 1:1 */
-    can->FM1R = 0xffffffff;
-
-    /* configure filter scable */
-    /* configure all filter bank for 32 bit mask mode */
-    can->FS1R = 0xFFFFFFFu;
-
-    /* configure pass message to which FIFO */
-    /* a half passing filter message to FIFO 0, otherwise will move to FIFO 1 */
-    can->FFA1R = 0x1FFFu;
-
-    /* configure id for all filter bank */
-
-    /* configure filter bank 0 */
-    /* dummy configure all matched id = 0 */
-    for (int i = 0; i < 28; i++) {
-        can->sFilterRegister[i].FR1 = (0x1u << 3) | (1 << 2);
-        can->sFilterRegister[i].FR2 = (0x1u << 3) | (1 << 2);
-    }
-
-    /* configure all filter active */
-    can->FA1R = 0xFFFFFFFu;
-
-    /* active filter */
-    can->FMR &= ~CAN_FMR_FINIT;
 }
 
 void can_stm32_set_mode(CAN_TypeDef * can, uint32_t can_mode)
@@ -143,13 +106,6 @@ void can_stm32_set_mode(CAN_TypeDef * can, uint32_t can_mode)
         default:
             break;
     }
-}
-
-void can_stm32_start(CAN_TypeDef * can)
-{
-    /* leave init mode */
-    can->MCR &= ~CAN_MCR_INRQ;
-    while((can->MSR & CAN_MSR_INAK) != 0U){};
 }
 
 void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
