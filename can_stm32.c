@@ -5,43 +5,81 @@ typedef struct
     /* data */
 } can_filter ;
 
+/* can bit timing */
+typedef struct
+{
+    uint16_t baudrate_prescaler; /* baudrate prescaler */
+    uint8_t time_segment_1;      /* time segment 1 */
+    uint8_t time_segment_2;      /* time segment 2 */
+    uint8_t resync_jump_width;   /* resync jump width */
+} can_stm32_bit_timing_struct_t;
 
-static void can_stm32_configure_filter(CAN_TypeDef * can)
+typedef struct 
+{
+    uint8_t filter_bank_assign_to_can_master; /* which filter bank assign to master */
+    uint32_t filter_active; /* which filter should active */
+    uint32_t filter_mode; /* mask or list mode */
+    uint32_t filter_scale; /* 16 bit or 32 bit */
+    uint32_t filter_fifo_assignment; /* which FIFO should assign to */
+    uint32_t filter_id; /* filter id */
+    uint32_t filter_mask; /* filter mask */
+} can_stm32_filter_struct_t;
+
+
+static void can_stm32_configure_filter(CAN_TypeDef * can, can_stm32_filter_struct_t * filter)
 {
     /* enter filter init mode */
     can->FMR |= CAN_FMR_FINIT;
 
     /* configure filter bank for CAN 1 and CAN 2 */
     /* configure 27 filter bank for CAN 1 and 1 filter bank for CAN 2 */
-    can->FMR |= 0x11011u << CAN_FMR_CAN2SB_Pos;
+    can->FMR |= (filter->filter_bank_assign_to_can_master) << CAN_FMR_CAN2SB_Pos;
 
-    /* configure mode for all filter bank */
     /* configure all filter bank under mask mode that mean comming message no need to map 1:1 */
-    can->FM1R = 0xffffffff;
+    can->FM1R |= (filter->filter_mode << filter->filter_active);
 
     /* configure filter scable */
-    /* configure all filter bank for 32 bit mask mode */
-    can->FS1R = 0xFFFFFFFu;
+    can->FS1R |= (filter->filter_scale << filter->filter_active);
 
     /* configure pass message to which FIFO */
     /* a half passing filter message to FIFO 0, otherwise will move to FIFO 1 */
-    can->FFA1R = 0x1FFFu;
+    can->FFA1R |= filter->filter_fifo_assignment << filter->filter_active;
 
-    /* configure id for all filter bank */
+    /* configure id for actived filter bank */
+    can->sFilterRegister[filter->filter_active].FR1 = filter->filter_id;
+    can->sFilterRegister[filter->filter_active].FR2 = filter->filter_mask;
 
-    /* configure filter bank 0 */
-    /* dummy configure all matched id = 0 */
-    for (int i = 0; i < 28; i++) {
-        can->sFilterRegister[i].FR1 = (0x1u << 3) | (1 << 2);
-        can->sFilterRegister[i].FR2 = (0x1u << 3) | (1 << 2);
-    }
-
-    /* configure all filter active */
-    can->FA1R = 0xFFFFFFFu;
+    /* active filter */
+    can->FA1R |= 1 << filter->filter_active;
 
     /* disable filter init mode */
     can->FMR &= ~CAN_FMR_FINIT;
 }
+
+static void can_stm32_enter_init_mode(CAN_TypeDef * can)
+{
+    /* enter init mode */
+    can->MCR |= CAN_MCR_INRQ;
+    while((can->MSR & CAN_MSR_INAK) == 0U){};
+}
+
+static void can_stm32_exit_sleep_mode(CAN_TypeDef * can)
+{
+    /* exit sleep mode */
+    can->MCR &= ~CAN_MCR_SLEEP;
+    while((can->MSR & CAN_MSR_SLAK) != 0U){};
+}
+
+static void can_stm32_configure_bit_timing(CAN_TypeDef * can, can_stm32_bit_timing_struct_t * bit_timing)
+{
+    /* set bit timing */
+    can->BTR |= (bit_timing->baudrate_prescaler) | \
+                (bit_timing->time_segment_1) | \
+                (bit_timing->time_segment_2) | \
+                (bit_timing->resync_jump_width);
+}
+
+
 
 void can_stm32_init(CAN_TypeDef * can)
 {
