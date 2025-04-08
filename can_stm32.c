@@ -1,34 +1,6 @@
 #include <soc.h>
 
-/* can bit timing */
-typedef struct
-{
-    uint16_t baudrate_prescaler; /* baudrate prescaler */
-    uint8_t time_segment_1;      /* time segment 1 */
-    uint8_t time_segment_2;      /* time segment 2 */
-    uint8_t resync_jump_width;   /* resync jump width */
-} can_stm32_bit_timing_struct_t;
-
-typedef struct 
-{
-    uint8_t filter_bank_assign_to_can_master; /* which filter bank assign to master */
-    uint32_t filter_active; /* which filter should active */
-    uint32_t filter_mode; /* mask or list mode */
-    uint32_t filter_scale; /* 16 bit or 32 bit */
-    uint32_t filter_fifo_assignment; /* which FIFO should assign to */
-    uint32_t filter_id; /* filter id */
-    uint32_t filter_mask; /* filter mask */
-} can_stm32_filter_struct_t;
-
-typedef enum
-{
-    CAN_MODE_SILENT    = 0,
-    CAN_MODE_LOOPBACK  = 1,
-} can_stm32_mode_enum_t;
-
-
-
-static void can_stm32_configure_filter(CAN_TypeDef * can, can_stm32_filter_struct_t * filter)
+void can_stm32_configure_filter(CAN_TypeDef * can, can_stm32_filter_struct_t * filter)
 {
     /* enter filter init mode */
     can->FMR |= CAN_FMR_FINIT;
@@ -65,7 +37,7 @@ static void can_stm32_enter_init_mode(CAN_TypeDef * can)
     while((can->MSR & CAN_MSR_INAK) == 0U){};
 }
 
-static void can_stm32_exit_init_mode(CAN_TypeDef * can)
+void can_stm32_exit_init_mode(CAN_TypeDef * can)
 {
     /* leave init mode */
     can->MCR &= ~CAN_MCR_INRQ;
@@ -88,10 +60,25 @@ static void can_stm32_configure_bit_timing(CAN_TypeDef * can, can_stm32_bit_timi
                 (bit_timing->resync_jump_width);
 }
 
+static void can_stm32_calculate_bit_timing(uint32_t bit_rate, uint32_t sample_point, can_stm32_bit_timing_struct_t * bit_timing)
+{
+
+}
+
 void can_stm32_init(CAN_TypeDef * can)
 {
+    uint32_t bit_rate = 0;
+    uint32_t sample_point = 0;
+    can_stm32_bit_timing_struct_t bit_timing;
+
     /* enter init mode */
-    can_stm32_exit_init_mode(can);
+    can_stm32_enter_init_mode(can);
+
+    /* calculate bit timming */
+    can_stm32_calculate_bit_timing(bit_rate, sample_point, &bit_timing);
+
+    /* configure bit timming */
+    can_stm32_configure_bit_timing(can, &bit_timing);
 
     /* exit sleep mode */
     can_stm32_exit_sleep_mode(can);
@@ -102,10 +89,10 @@ void can_stm32_set_mode(CAN_TypeDef * can, can_stm32_mode_enum_t can_mode)
 {
     switch(can_mode)
     {
-        case CAN_MODE_SILENT:
+        case MODE_SILENT:
             can->BTR |= CAN_BTR_SILM;
             break;
-        case CAN_MODE_LOOPBACK:
+        case MODE_LOOPBACK:
             can->BTR |= CAN_BTR_LBKM;
             break;
         default:
@@ -207,7 +194,6 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
     }
 }
-
 
 
 
