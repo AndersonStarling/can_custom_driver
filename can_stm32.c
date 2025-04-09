@@ -149,21 +149,19 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
 {
     uint8_t rx_index_mailbox = 0;
     uint8_t sub_index = 0;
-    volatile uint32_t FIFO_FMP_array[2]  = {can->RF0R & CAN_RF0R_FMP0, can->RF1R & CAN_RF1R_FMP1};
-    volatile uint32_t FIFO_RFOM_array[2] = {can->RF0R & CAN_RF0R_RFOM0, can->RF1R & CAN_RF1R_RFOM1};
-
+    volatile uint32_t * FIFO_array[2] = {(volatile uint32_t *)&can->RF0R, (volatile uint32_t *)&can->RF1R};
 
     /* polling waiting for message come */
-    while((can->IER & CAN_IER_FMPIE0) == 0U || \
-          (can->IER & CAN_IER_FMPIE1) == 0U){};
+    while(((can->RF0R & CAN_RF0R_FMP0) == 0U) && \
+          ((can->RF1R & CAN_RF1R_FMP1) == 0U)){};
 
     /* FIFO 0 have message */
-    if((can->IER & CAN_IER_FMPIE0) == 0U)
+    if((can->RF0R & CAN_RF0R_FMP0) != 0U)
     {
         rx_index_mailbox = 0;
     }
     /* FIFO 1 have message */
-    else if((can->IER & CAN_IER_FMPIE1) == 0U)
+    else if((can->RF1R & CAN_RF1R_FMP1) != 0U)
     {
         rx_index_mailbox = 1;
     }
@@ -172,7 +170,7 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         /* no message */
     }
 
-    while(FIFO_FMP_array[rx_index_mailbox] != 0U)
+    while((*(volatile uint32_t *)FIFO_array[rx_index_mailbox] & CAN_RF0R_FMP0) != 0U)
     {
         /* get id */
         recv_frame->id = can->sFIFOMailBox[rx_index_mailbox].RIR >> CAN_RI0R_EXID_Pos;
@@ -191,7 +189,7 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
             recv_frame->data[sub_index + 4] = (can->sFIFOMailBox[rx_index_mailbox].RDHR >> (sub_index * 8)) & 0xFF;
         }
         /* release RX FIFO mailbox */
-        FIFO_RFOM_array[rx_index_mailbox] |= CAN_RF0R_RFOM0;
+        *(volatile uint32_t *)(FIFO_array[rx_index_mailbox]) |= CAN_RF0R_RFOM0;
     }
 }
 
