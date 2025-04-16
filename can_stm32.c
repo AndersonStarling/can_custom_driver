@@ -1,4 +1,5 @@
 #include <soc.h>
+#include <zephyr/drivers/can.h>
 
 void can_stm32_configure_filter(CAN_TypeDef * can, can_stm32_filter_struct_t * filter)
 {
@@ -100,7 +101,7 @@ void can_stm32_set_mode(CAN_TypeDef * can, can_stm32_mode_enum_t can_mode)
     }
 }
 
-void can_stm32_send(CAN_TypeDef * can, can_frame * frame)
+void can_stm32_send_internal(CAN_TypeDef * can, can_frame * frame)
 {
     uint8_t tx_index_mailbox = 0;
 
@@ -192,6 +193,86 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
         *(volatile uint32_t *)(FIFO_array[rx_index_mailbox]) |= CAN_RF0R_RFOM0;
     }
 }
+
+
+
+/* can zephyr api mapping from device tree */
+static int can_stm32_start(const struct device *dev)
+{
+    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    CAN_TypeDef *can = cfg->can;
+
+    can_stm32_exit_init_mode(can);
+
+    return 0;
+}
+
+static int can_stm32_stop(const struct device *dev)
+{
+    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    CAN_TypeDef *can = cfg->can;
+
+    can_stm32_enter_init_mode(can);
+
+    return 0;
+}
+
+static int can_stm32_set_mode(const struct device *dev, can_mode_t mode)
+{
+    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    CAN_TypeDef *can = cfg->can;
+
+    can_stm32_set_mode(can, mode);
+
+    return 0;
+}
+
+static int can_stm32_configure_timing(const struct device *dev, const struct can_timing *timing)
+{
+    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    CAN_TypeDef *can = cfg->can;
+    can_stm32_bit_timing_struct_t bit_timing;
+
+    /* configure bit timing */
+    can_stm32_configure_bit_timing(can, &bit_timing);
+
+    return 0;
+}
+
+static int can_stm32_send(const struct device *dev,                        \
+                          const struct can_frame *frame,                   \
+                          k_timeout_t timeout, can_tx_callback_t callback, \
+                          void *user_data)
+{
+    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    CAN_TypeDef *can = cfg->can;
+
+    can_stm32_send_internal(can, frame);
+
+    return 0;
+}
+
+static const struct can_driver_api can_api_funcs = {
+	.start = can_stm32_start,
+	.stop = can_stm32_stop,
+	.set_mode = can_stm32_set_mode,
+	.set_timing = can_stm32_configure_timing,
+	.send = can_stm32_send,
+	.timing_min = {
+		.sjw = 0x1,
+		.prop_seg = 0x00,
+		.phase_seg1 = 0x01,
+		.phase_seg2 = 0x01,
+		.prescaler = 0x01
+	},
+	.timing_max = {
+		.sjw = 0x04,
+		.prop_seg = 0x00,
+		.phase_seg1 = 0x10,
+		.phase_seg2 = 0x08,
+		.prescaler = 0x400
+	}
+};
 
 
 
