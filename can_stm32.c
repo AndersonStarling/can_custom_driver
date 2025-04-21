@@ -252,12 +252,28 @@ static int can_stm32_send(const struct device *dev,                        \
     return 0;
 }
 
+static int can_stm32_add_rx_filter(const struct device *dev,
+                                    can_rx_callback_t callback,
+                                    void *user_data,
+                                    const struct can_filter *filter)
+{
+    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    CAN_TypeDef *can = cfg->can;
+    can_stm32_filter_struct_t filter_struct;
+
+    /* configure filter */
+    can_stm32_configure_filter(can, &filter_struct);
+
+    return 0;
+}
+
 static const struct can_driver_api can_api_funcs = {
 	.start = can_stm32_start,
 	.stop = can_stm32_stop,
 	.set_mode = can_stm32_set_mode,
 	.set_timing = can_stm32_configure_timing,
 	.send = can_stm32_send,
+    .add_rx_filter = can_stm32_add_rx_filter,
 	.timing_min = {
 		.sjw = 0x1,
 		.prop_seg = 0x00,
@@ -274,6 +290,29 @@ static const struct can_driver_api can_api_funcs = {
 	}
 };
 
+
+#define CAN_STM32_CONFIG_INST(inst) \
+
+static const struct can_stm32_config can_stm32_cfg_##inst = 
+{
+       .can = (CAN_TypeDef *)DT_INST_REG_ADDR(inst),  
+};
+
+#define CAN_STM32_DATA_INST(inst) \
+static struct can_stm32_data can_stm32_dev_data_##inst;
+
+#define CAN_STM32_DEFINE_INST(inst) \
+CAN_DEVICE_DT_INST_DEFINE(inst, can_stm32_init, NULL,                    \
+    &can_stm32_dev_data_##inst, &can_stm32_cfg_##inst, \
+    POST_KERNEL, CONFIG_CAN_INIT_PRIORITY,         \
+    &can_api_funcs);
+
+#define CAN_STM32_INST(inst) \
+CAN_STM32_DATA_INST(inst)    \
+CAN_STM32_CONFIG_INST(inst)  \
+CAN_STM32_DEFINE_INST(inst)
+
+DT_INST_FOREACH_STATUS_OKAY(CAN_STM32_INST)
 
 
 
