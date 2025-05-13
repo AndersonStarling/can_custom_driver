@@ -1,5 +1,80 @@
 #include <soc.h>
 #include <zephyr/drivers/can.h>
+#include <zephyr/drivers/can/transceiver.h>
+
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/drivers/clock_control/stm32_clock_control.h>
+#include <zephyr/drivers/pinctrl.h>
+#include <zephyr/irq.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
+
+#define CONFIG_CAN_MAX_STD_ID_FILTER 14
+#define CONFIG_CAN_MAX_EXT_ID_FILTER 7
+
+/* User define struct */
+typedef struct
+{
+    uint8_t filter_bank_assign_to_can_master; /* which filter bank assign to master */
+    uint32_t filter_active; /* which filter should active */
+    uint32_t filter_mode; /* mask or list mode */
+    uint32_t filter_scale; /* 16 bit or 32 bit */
+    uint32_t filter_fifo_assignment; /* which FIFO should assign to */
+    uint32_t filter_id; /* filter id */
+    uint32_t filter_mask; /* filter mask */
+} can_stm32_filter_struct_t;
+
+
+typedef struct
+{
+    uint16_t baudrate_prescaler; /* baudrate prescaler */
+    uint8_t time_segment_1;      /* time segment 1 */
+    uint8_t time_segment_2;      /* time segment 2 */
+    uint8_t resync_jump_width;   /* resync jump width */
+} can_stm32_bit_timing_struct_t;
+
+/***************************************/
+
+/* User define enum */
+
+typedef enum
+{
+    MODE_SILENT    = 0,
+    MODE_LOOPBACK  = 1,
+} can_stm32_mode_enum_t;
+
+/***************************************/
+
+struct can_stm32_mailbox {
+	can_tx_callback_t tx_callback;
+	void *callback_arg;
+};
+
+struct can_stm32_data {
+	struct can_driver_data common;
+	struct k_mutex inst_mutex;
+	struct k_sem tx_int_sem;
+	struct can_stm32_mailbox mb0;
+	struct can_stm32_mailbox mb1;
+	struct can_stm32_mailbox mb2;
+	can_rx_callback_t rx_cb_std[CONFIG_CAN_MAX_STD_ID_FILTER];
+	can_rx_callback_t rx_cb_ext[CONFIG_CAN_MAX_EXT_ID_FILTER];
+	void *cb_arg_std[CONFIG_CAN_MAX_STD_ID_FILTER];
+	void *cb_arg_ext[CONFIG_CAN_MAX_EXT_ID_FILTER];
+	enum can_state state;
+};
+
+struct can_stm32_config {
+	const struct can_driver_config common;
+	CAN_TypeDef *can;   /*!< CAN Registers*/
+	CAN_TypeDef *master_can;   /*!< CAN Registers for shared filter */
+	struct stm32_pclken pclken;
+	void (*config_irq)(CAN_TypeDef *can);
+	const struct pinctrl_dev_config *pcfg;
+};
+
+#define DT_DRV_COMPAT st_stm32_bxcan
 
 void can_stm32_configure_filter(CAN_TypeDef * can, can_stm32_filter_struct_t * filter)
 {
@@ -86,7 +161,7 @@ void can_stm32_init(CAN_TypeDef * can)
 
 }
 
-void can_stm32_set_mode(CAN_TypeDef * can, can_stm32_mode_enum_t can_mode)
+void can_stm32_set_mode_internal(CAN_TypeDef * can, can_stm32_mode_enum_t can_mode)
 {
     switch(can_mode)
     {
@@ -101,7 +176,7 @@ void can_stm32_set_mode(CAN_TypeDef * can, can_stm32_mode_enum_t can_mode)
     }
 }
 
-void can_stm32_send_internal(CAN_TypeDef * can, can_frame * frame)
+void can_stm32_send_internal(CAN_TypeDef * can, const struct can_frame * frame)
 {
     uint8_t tx_index_mailbox = 0;
 
@@ -146,7 +221,7 @@ void can_stm32_send_internal(CAN_TypeDef * can, can_frame * frame)
     }
 }
 
-void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
+void can_stm32_recv(CAN_TypeDef * can, struct can_frame * recv_frame)
 {
     uint8_t rx_index_mailbox = 0;
     uint8_t sub_index = 0;
@@ -199,7 +274,7 @@ void can_stm32_recv(CAN_TypeDef * can, can_frame * recv_frame)
 /* can zephyr api mapping from device tree */
 static int can_stm32_start(const struct device *dev)
 {
-    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    const struct can_stm32_config *cfg = (struct can_stm32_config *)dev->config;
     CAN_TypeDef *can = cfg->can;
 
     can_stm32_exit_init_mode(can);
@@ -209,7 +284,7 @@ static int can_stm32_start(const struct device *dev)
 
 static int can_stm32_stop(const struct device *dev)
 {
-    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    const struct can_stm32_config *cfg = (struct can_stm32_config *)dev->config;
     CAN_TypeDef *can = cfg->can;
 
     can_stm32_enter_init_mode(can);
@@ -219,17 +294,17 @@ static int can_stm32_stop(const struct device *dev)
 
 static int can_stm32_set_mode(const struct device *dev, can_mode_t mode)
 {
-    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    const struct can_stm32_config *cfg = (struct can_stm32_config *)dev->config;
     CAN_TypeDef *can = cfg->can;
 
-    can_stm32_set_mode(can, mode);
+    can_stm32_set_mode_internal(can, mode);
 
     return 0;
 }
 
 static int can_stm32_configure_timing(const struct device *dev, const struct can_timing *timing)
 {
-    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    const struct can_stm32_config *cfg = (struct can_stm32_config *)dev->config;
     CAN_TypeDef *can = cfg->can;
     can_stm32_bit_timing_struct_t bit_timing;
 
@@ -244,7 +319,7 @@ static int can_stm32_send(const struct device *dev,                        \
                           k_timeout_t timeout, can_tx_callback_t callback, \
                           void *user_data)
 {
-    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    const struct can_stm32_config *cfg = (struct can_stm32_config *)dev->config;
     CAN_TypeDef *can = cfg->can;
 
     can_stm32_send_internal(can, frame);
@@ -257,7 +332,7 @@ static int can_stm32_add_rx_filter(const struct device *dev,
                                     void *user_data,
                                     const struct can_filter *filter)
 {
-    const struct can_stm32_config *cfg = (can_stm32_config *)dev->config;
+    const struct can_stm32_config *cfg = (struct can_stm32_config *)dev->config;
     CAN_TypeDef *can = cfg->can;
     can_stm32_filter_struct_t filter_struct;
 
@@ -291,11 +366,10 @@ static const struct can_driver_api can_api_funcs = {
 };
 
 
-#define CAN_STM32_CONFIG_INST(inst) \
-
-static const struct can_stm32_config can_stm32_cfg_##inst = 
-{
-       .can = (CAN_TypeDef *)DT_INST_REG_ADDR(inst),  
+#define CAN_STM32_CONFIG_INST(inst)                          \
+static const struct can_stm32_config can_stm32_cfg_##inst =  \
+{                                                            \
+       .can = (CAN_TypeDef *)DT_INST_REG_ADDR(inst)          \
 };
 
 #define CAN_STM32_DATA_INST(inst) \
