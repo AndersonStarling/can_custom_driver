@@ -1,4 +1,0 @@
-
-config CAN_CUSTOM_DRIVER
-    bool "Custom CAN driver"
-    default y

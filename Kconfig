@@ -1,0 +1,16 @@
+# CAN configuration options
+
+# Copyright (c) 2018 Alexander Wachter
+# SPDX-License-Identifier: Apache-2.0
+
+#
+# CAN options
+#
+
+menuconfig USER_CAN
+	bool "Controller Area Network (CAN) drivers write by user"
+	help
+	  Enable CAN Driver Configuration
+
+source "user_driver/can_custom_driver/Kconfig.stm32_custom"
+

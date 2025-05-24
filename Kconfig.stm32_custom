@@ -1,0 +1,11 @@
+# STM32 CAN configuration options
+
+# Copyright (c) 2022 Blue Clover
+# Copyright (c) 2018-2020 Alexander Wachter
+# SPDX-License-Identifier: Apache-2.0
+
+config CAN_STM32_CUSTOM
+	bool "STM32 CAN driver custom"
+	default y
+	help
+	  Enable STM32 CAN Driver custom.
